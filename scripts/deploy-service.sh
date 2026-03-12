@@ -216,8 +216,16 @@ pct start "${SVC_VMID}"
 # Step 4: Wait for container to boot
 sleep 6
 
-# Step 5: Install base dependencies
-pct exec "${SVC_VMID}" -- bash -c 'set -e; apt-get update -qq && apt-get install -y -qq curl ca-certificates libicu-dev'
+# Step 4b: Ensure DNS resolution works inside the container
+pct exec "${SVC_VMID}" -- bash -c "echo 'nameserver ${PVE_NAMESERVER}' > /etc/resolv.conf"
+sleep 2
+
+# Step 5: Install base dependencies (retry once on failure)
+pct exec "${SVC_VMID}" -- bash -c 'set -e; apt-get update -qq && apt-get install -y -qq curl ca-certificates libicu-dev' || {
+  echo "Retrying apt after 10s..."
+  sleep 10
+  pct exec "${SVC_VMID}" -- bash -c 'set -e; apt-get update -qq && apt-get install -y -qq curl ca-certificates libicu-dev'
+}
 
 # Step 6: Create service user
 pct exec "${SVC_VMID}" -- bash -c "useradd -r -s /bin/false ${SERVICE_ID} 2>/dev/null || true"
