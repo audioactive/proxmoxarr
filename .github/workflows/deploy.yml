@@ -49,6 +49,7 @@ jobs:
           host: ${{ secrets.PVE_HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: 22
           source: "scripts/,config/"
           target: "/tmp/proxmoxarr-deploy"
@@ -59,6 +60,7 @@ jobs:
           host: ${{ secrets.PVE_HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: 22
           script: |
             cd /tmp/proxmoxarr-deploy
@@ -90,6 +92,7 @@ jobs:
           host: ${{ secrets.PVE_HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: 22
           script: |
             rm -rf /tmp/proxmoxarr-deploy
