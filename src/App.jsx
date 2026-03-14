@@ -23,7 +23,7 @@ const PVE_STORAGE_OPTS = ["local-lvm","local","local-zfs","ceph","nfs"];
 
 const DEFAULT_NETWORK = { name:"arr-network", driver:"bridge", subnet:"172.20.0.0/16", gateway:"172.20.0.1", enableIPv6:false, internal:false };
 const DEFAULT_VOLUMES  = { baseConfigPath:"/opt/arr/config", baseMediaPath:"/mnt/media", baseDownloadPath:"/mnt/downloads", puid:"1000", pgid:"1000", tz:"Europe/Berlin" };
-const DEFAULT_SSH      = { host: "", user:"root", port:"22", keyPath:"~/.ssh/id_rsa", deployPath:"/opt/arr", useKey:true, wsPort:"2222" };
+const DEFAULT_SSH      = { host: import.meta.env.VITE_WS_HOST || "", user:"root", port:"22", keyPath:"~/.ssh/id_rsa", deployPath:"/opt/arr", useKey:true, wsPort: import.meta.env.VITE_WS_PORT || "2222" };
 const DEFAULT_PVE      = { node:"pve", bridge:"vmbr1", storage:"local-lvm", osTemplate:"local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst", defaultGw:"10.10.10.1", subnetCidr:"24", nameserver:"1.1.1.1", unprivileged:true, startOnBoot:true, osType:"debian", vmidRangeFrom:2000, vmidRangeTo:3000 };
 
 // ── styles ───────────────────────────────────────────────────────────────────
