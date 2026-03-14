@@ -151,7 +151,7 @@ function pctCreateOCI(svc, pve, volumes) {
     svc.apiKey ? `API_KEY=${svc.apiKey}` : "",
   ].filter(Boolean);
   return [
-    `pct create ${svc.vmid} ${svc.ociImage}`,
+    `pct create ${svc.vmid} docker://${svc.ociImage}`,
     `  --arch amd64`,
     `  --ostype unmanaged`,
     `  --hostname ${svc.id}`,
