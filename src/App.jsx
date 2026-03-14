@@ -688,7 +688,7 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                {svc.deployMode==="oci"&&<span style={{fontSize:11,color:"#475569",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={svc.ociImage}>{svc.ociImage}</span>}
+                {svc.deployMode==="oci"&&<a href={`https://${svc.ociImage.replace(/:.*$/,"")}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:"#3b82f6",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textDecoration:"none"}} title={svc.ociImage}>{svc.ociImage}</a>}
               </div>
             </div>
           ))}
