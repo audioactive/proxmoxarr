@@ -3,7 +3,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 // ── Proxmox REST API Client ──────────────────────────────────────────────────
 class PveAPI {
   constructor(cfg) {
-    this.base    = `https://${cfg.host}:${cfg.apiPort||8006}/api2/json`;
+    this.target  = `${cfg.host}:${cfg.apiPort||8006}`;
+    this.base    = `/pve-api`;
     this.node    = cfg.node || "pve";
     this.mode    = cfg.authMode || "token";
     this.tokenId = cfg.tokenId || "";
@@ -14,14 +15,15 @@ class PveAPI {
     this.csrf    = null;
   }
   headers(isForm) {
-    if (this.mode === "token") return { "Authorization":`PVEAPIToken=${this.tokenId}=${this.secret}`, ...(isForm?{}:{"Content-Type":"application/json"}) };
-    const h = isForm ? {} : { "Content-Type":"application/json" };
+    const base = { "X-PVE-Target": this.target };
+    if (this.mode === "token") return { ...base, "Authorization":`PVEAPIToken=${this.tokenId}=${this.secret}`, ...(isForm?{}:{"Content-Type":"application/json"}) };
+    const h = { ...base, ...(isForm ? {} : { "Content-Type":"application/json" }) };
     if (this.ticket) { h["Cookie"]=`PVEAuthCookie=${this.ticket}`; h["CSRFPreventionToken"]=this.csrf; }
     return h;
   }
   async login() {
     if (this.mode==="token") return true;
-    const r = await fetch(`${this.base}/access/ticket`,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({username:this.user,password:this.password})});
+    const r = await fetch(`${this.base}/access/ticket`,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded","X-PVE-Target":this.target},body:new URLSearchParams({username:this.user,password:this.password})});
     const j = await r.json();
     if (j?.data) { this.ticket=j.data.ticket; this.csrf=j.data.CSRFPreventionToken; return true; }
     return false;
@@ -61,20 +63,24 @@ async function waitTask(api, upid, onLog) {
 
 // ── Services & Defaults ──────────────────────────────────────────────────────
 const DEFAULT_SERVICES = [
-  { id:"sonarr",       name:"Sonarr",       icon:"📺", port:8989,  enabled:true,  mediaPath:"/media/tv",     configPath:"/config/sonarr",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2000, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/sonarr:latest" },
-  { id:"radarr",       name:"Radarr",       icon:"🎬", port:7878,  enabled:true,  mediaPath:"/media/movies", configPath:"/config/radarr",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2001, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/radarr:latest" },
-  { id:"prowlarr",     name:"Prowlarr",     icon:"🔍", port:9696,  enabled:true,  mediaPath:"",              configPath:"/config/prowlarr",    apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2002, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/prowlarr:latest" },
-  { id:"lidarr",       name:"Lidarr",       icon:"🎵", port:8686,  enabled:false, mediaPath:"/media/music",  configPath:"/config/lidarr",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2003, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/lidarr:latest" },
-  { id:"jackett",      name:"Jackett",      icon:"🧥", port:9117,  enabled:false, mediaPath:"",              configPath:"/config/jackett",     apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2004, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/jackett:latest" },
-  { id:"bazarr",       name:"Bazarr",       icon:"💬", port:6767,  enabled:false, mediaPath:"/media",        configPath:"/config/bazarr",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2005, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/bazarr:latest" },
-  { id:"qbittorrent",  name:"qBittorrent",  icon:"⬇️", port:8080,  enabled:true,  mediaPath:"/downloads",    configPath:"/config/qbittorrent", apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2006, cores:2, mem:1024, disk:8,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/qbittorrent:latest" },
-  { id:"overseerr",    name:"Overseerr",    icon:"🎟️", port:5055,  enabled:false, mediaPath:"",              configPath:"/config/overseerr",   apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2007, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/overseerr:latest" },
-  { id:"jellyfin",     name:"Jellyfin",     icon:"🍇", port:8096,  enabled:false, mediaPath:"/media",        configPath:"/config/jellyfin",    apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2008, cores:2, mem:2048, disk:8,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/jellyfin:latest" },
-  { id:"plex",         name:"Plex",         icon:"🟡", port:32400, enabled:false, mediaPath:"/media",        configPath:"/config/plex",        apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2009, cores:2, mem:2048, disk:8,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/plex:latest" },
-  { id:"tautulli",     name:"Tautulli",     icon:"📊", port:8181,  enabled:false, mediaPath:"",              configPath:"/config/tautulli",    apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2010, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/tautulli:latest" },
-  { id:"flaresolverr", name:"FlareSolverr", icon:"🔓", port:8191,  enabled:false, mediaPath:"",              configPath:"",                    apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2011, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"ghcr.io/flaresolverr/flaresolverr:latest" },
-  { id:"sabnzbd",      name:"SABnzbd",      icon:"📡", port:8090,  enabled:false, mediaPath:"/downloads",    configPath:"/config/sabnzbd",     apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2012, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/sabnzbd:latest" },
-  { id:"mylar3",       name:"Mylar3",       icon:"📰", port:8090,  enabled:false, mediaPath:"/media/comics", configPath:"/config/mylar3",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2013, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/mylar3:latest" },
+  { id:"sonarr",       name:"Sonarr",       icon:"📺", port:8989,  enabled:true,  mediaPath:"/media/tv",     configPath:"/config/sonarr",        apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2000, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/sonarr:latest" },
+  { id:"radarr",       name:"Radarr",       icon:"🎬", port:7878,  enabled:true,  mediaPath:"/media/movies", configPath:"/config/radarr",        apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2001, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/radarr:latest" },
+  { id:"lidarr",       name:"Lidarr",       icon:"🎵", port:8686,  enabled:false, mediaPath:"/media/music",  configPath:"/config/lidarr",        apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2002, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/lidarr:latest" },
+  { id:"whisparr",     name:"Whisparr",     icon:"🔞", port:6969,  enabled:false, mediaPath:"/media/xxx",    configPath:"/config/whisparr",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2003, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"ghcr.io/hotio/whisparr:v3" },
+  { id:"prowlarr",     name:"Prowlarr",     icon:"🔍", port:9696,  enabled:true,  mediaPath:"",              configPath:"/config/prowlarr",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2004, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/prowlarr:latest" },
+  { id:"jackett",      name:"Jackett",      icon:"🧥", port:9117,  enabled:false, mediaPath:"",              configPath:"/config/jackett",       apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2005, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/jackett:latest" },
+  { id:"nzbhydra2",    name:"NZBHydra2",    icon:"🐙", port:5076,  enabled:false, mediaPath:"",              configPath:"/config/nzbhydra2",     apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2006, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/nzbhydra2:latest" },
+  { id:"recyclarr",    name:"Recyclarr",    icon:"♻️", port:0,     enabled:false, mediaPath:"",              configPath:"/config/recyclarr",     apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2007, cores:1, mem:128,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"ghcr.io/recyclarr/recyclarr:latest" },
+  { id:"qbittorrent",  name:"qBittorrent",  icon:"⬇️", port:8080,  enabled:true,  mediaPath:"/downloads",    configPath:"/config/qbittorrent",   apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2008, cores:2, mem:1024, disk:8,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/qbittorrent:latest" },
+  { id:"sabnzbd",      name:"SABnzbd",      icon:"📡", port:8090,  enabled:false, mediaPath:"/downloads",    configPath:"/config/sabnzbd",       apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2009, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/sabnzbd:latest" },
+  { id:"netnzb",       name:"NetNZB",       icon:"📰", port:5076,  enabled:false, mediaPath:"/downloads",    configPath:"/config/netnzb",        apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2010, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"ghcr.io/netnzb/netnzb:latest" },
+  { id:"flaresolverr", name:"FlareSolverr", icon:"🔓", port:8191,  enabled:false, mediaPath:"",              configPath:"",                      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2011, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"ghcr.io/flaresolverr/flaresolverr:latest" },
+  { id:"plex",         name:"Plex",         icon:"🟡", port:32400, enabled:false, mediaPath:"/media",        configPath:"/config/plex",          apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2012, cores:2, mem:2048, disk:8,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/plex:latest" },
+  { id:"jellyfin",     name:"Jellyfin",     icon:"🍇", port:8096,  enabled:false, mediaPath:"/media",        configPath:"/config/jellyfin",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2013, cores:2, mem:2048, disk:8,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/jellyfin:latest" },
+  { id:"bazarr",       name:"Bazarr",       icon:"💬", port:6767,  enabled:false, mediaPath:"/media",        configPath:"/config/bazarr",        apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2014, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/bazarr:latest" },
+  { id:"overseerr",    name:"Overseerr",    icon:"🎟️", port:5055,  enabled:false, mediaPath:"",              configPath:"/config/overseerr",     apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2015, cores:1, mem:512,  disk:4,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/overseerr:latest" },
+  { id:"tautulli",     name:"Tautulli",     icon:"📊", port:8181,  enabled:false, mediaPath:"",              configPath:"/config/tautulli",      apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2016, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/tautulli:latest" },
+  { id:"mylar3",       name:"Mylar3",       icon:"📰", port:8090,  enabled:false, mediaPath:"/media/comics", configPath:"/config/mylar3",        apiKey:"", restartPolicy:"unless-stopped", startOnBoot:true, vmid:2017, cores:1, mem:256,  disk:2,  ip:"", gw:"", deployMode:"oci", ociImage:"lscr.io/linuxserver/mylar3:latest" },
 ];
 
 const RESTART_POLICIES = ["no","always","on-failure","unless-stopped"];
@@ -83,8 +89,8 @@ const PVE_STORAGE_OPTS = ["local-lvm","local","local-zfs","ceph","nfs"];
 
 const DEFAULT_NETWORK = { name:"arr-network", driver:"bridge", subnet:"172.20.0.0/16", gateway:"172.20.0.1", enableIPv6:false, internal:false };
 const DEFAULT_VOLUMES = { baseConfigPath:"/opt/arr/config", baseMediaPath:"/mnt/media", baseDownloadPath:"/mnt/downloads", puid:"1000", pgid:"1000", tz:"Europe/Berlin" };
-const DEFAULT_PVE     = { node:"pve", bridge:"vmbr1", storage:"local-lvm", osTemplate:"local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst", defaultGw:"10.10.10.1", subnetCidr:"24", nameserver:"1.1.1.1", unprivileged:true, startOnBoot:true, osType:"debian", vmidRangeFrom:2000, vmidRangeTo:3000 };
-const DEFAULT_API     = { host:"", apiPort:"8006", authMode:"token", tokenId:"root@pam!arr-tool", secret:"", user:"root@pam", password:"" };
+const DEFAULT_PVE     = { node:"netcup", bridge:"vmbr1", storage:"netcup-data", osTemplate:"local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst", defaultGw:"10.10.10.1", subnetCidr:"24", nameserver:"1.1.1.1", unprivileged:true, startOnBoot:true, osType:"debian", vmidRangeFrom:2000, vmidRangeTo:3000 };
+const DEFAULT_API     = { host:"netcup.acidhosting.de", apiPort:"8006", authMode:"token", tokenId:"root@pam!proxarr", secret:"ff9aaab8-644e-4564-8fd8-3de00dbc417a", user:"root@pam", password:"" };
 
 // ── VMID helpers ─────────────────────────────────────────────────────────────
 function assignVmidsFromRange(svcs, from, to) {
@@ -124,21 +130,25 @@ function buildCreateParams(svc, pve, volumes) {
     onboot:      (svc.startOnBoot??pve.startOnBoot) ? 1 : 0,
     start:       0,
     unprivileged:pve.unprivileged ? 1 : 0,
-    mp0:         `${volumes.baseConfigPath}/${svc.id},mp=/config`,
   };
   if (isOCI) { p.arch="amd64"; p.ostype="unmanaged"; }
   else        p.ostype = pve.osType;
-  if (svc.mediaPath) p.mp1 = `${volumes.baseMediaPath},mp=/data`;
-  if (hasDl)         p.mp2 = `${volumes.baseDownloadPath},mp=/downloads`;
+  // Bind mount points – extracted separately (API tokens can't set bind mounts)
+  const mounts = {};
+  mounts.mp0 = `${volumes.baseConfigPath}/${svc.id},mp=/config`;
+  if (svc.mediaPath) mounts.mp1 = `${volumes.baseMediaPath},mp=/data`;
+  if (hasDl)         mounts.mp2 = `${volumes.baseDownloadPath},mp=/downloads`;
   const envs = [`PUID=1000`,`PGID=1000`,`TZ=${volumes.tz}`,svc.apiKey?`API_KEY=${svc.apiKey}`:null].filter(Boolean);
-  p.tags = envs.join(";");
-  return p;
+  p.description = envs.join("\n");
+  p.tags = [svc.id, isOCI?"oci":"lxc", "arr-tool"].join(";");
+  return { params: p, mounts };
 }
 
 // ── pct create string (for display only) ─────────────────────────────────────
 function pctCreateStr(svc, pve, volumes) {
-  const p = buildCreateParams(svc, pve, volumes);
-  return Object.entries(p).map(([k,v])=>`  --${k} ${v}`).join(" \\\n").replace(/^  /,"pct create ");
+  const { params, mounts } = buildCreateParams(svc, pve, volumes);
+  const all = { ...params, ...mounts };
+  return Object.entries(all).map(([k,v])=>`  --${k} ${v}`).join(" \\\n").replace(/^  /,"pct create ");
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
@@ -314,14 +324,31 @@ export default function App() {
     const svcR={...svc,vmid};
     setDeploying(p=>({...p,[svc.id]:"running"}));
     try{
-      log(`🚀 Deploy ${svc.name} (VMID ${vmid}, ${svc.deployMode.toUpperCase()})…`);
-      const params=buildCreateParams(svcR,pve,volumes);
+      log(`🚀 Deploy ${svc.name} (VMID ${vmid}, ${(svc.deployMode||"oci").toUpperCase()})…`);
+      const { params, mounts } = buildCreateParams(svcR,pve,volumes);
+      // Step 1: Create container (without bind mounts – API tokens can't set them)
       const res=await a.ctCreate(params);
       const upid=res?.data;
       if(!upid) throw new Error("Kein Task-UPID");
-      log(`⏳ Task: ${upid}`);
+      log(`⏳ Container wird erstellt…`);
       const ok=await waitTask(a,upid,s=>{ if(s) log(s); });
-      if(!ok) throw new Error("Task fehlgeschlagen");
+      if(!ok) throw new Error("Container-Erstellung fehlgeschlagen");
+      // Step 2: Add bind mounts via local pct set (runs on PVE host)
+      if (Object.keys(mounts).length) {
+        log(`📁 Bind-Mounts werden gesetzt…`);
+        const mpRes = await fetch('/pve-local/pct-mountpoints', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vmid, ...mounts })
+        });
+        if (!mpRes.ok) {
+          const err = await mpRes.json().catch(()=>({}));
+          log(`⚠️ Bind-Mounts fehlgeschlagen: ${err.error||mpRes.statusText} – Container erstellt aber ohne Mounts`,"warn");
+        } else {
+          log(`✅ Bind-Mounts gesetzt`);
+        }
+      }
+      // Step 3: Start container
       await a.ctStart(vmid);
       log(`✅ ${svc.name} deployed & gestartet`,"ok");
       setDeploying(p=>({...p,[svc.id]:"done"}));
