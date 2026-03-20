@@ -501,6 +501,42 @@ export default function App() {
             <button style={{...st.btn("#64748b"),marginTop:6,fontSize:11}} onClick={()=>setApiLog([])}>🗑 Log leeren</button>
           </div>
 
+          {/* Proxmox-Konfiguration */}
+          <div style={{...st.card,marginBottom:16}}>
+            <div style={{...st.row,cursor:"pointer"}} onClick={()=>setPveOpen(o=>!o)}>
+              <span style={st.sec}>Proxmox-Konfiguration</span>
+              <span style={{fontSize:13,color:"#475569",transform:pveOpen?"rotate(90deg)":"none",display:"inline-block",transition:"transform .2s"}}>›</span>
+            </div>
+            {pveOpen&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:14,marginTop:14}}>
+              {[["Node","node"],["Bridge","bridge"],["Default GW","defaultGw"],["Nameserver","nameserver"],["Subnetz-Prefix","subnetCidr"],["OS-Typ","osType"]].map(([l,k])=>(
+                <div key={k}><label style={st.lbl}>{l}</label><input style={st.inp} value={pve[k]} onChange={e=>setPve(p=>({...p,[k]:e.target.value}))}/></div>
+              ))}
+              <div style={{gridColumn:"1/-1"}}>
+                <label style={st.lbl}>Storage</label>
+                <div style={{display:"flex",gap:8}}>
+                  <select style={{...st.inp,flex:1}} value={pve.storage} onChange={e=>setPve(p=>({...p,storage:e.target.value}))}>{storageList.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                  <button style={{...st.btn(apiConnected?"#60a5fa":"#475569"),opacity:apiConnected?1:0.5}} disabled={!apiConnected} onClick={async()=>{ const r=await apiRef.current?.storages().catch(()=>null); if(r?.data) setStorageList(r.data.map(s=>s.storage)); }}>🔄</button>
+                </div>
+              </div>
+              <div style={{gridColumn:"1/-1"}}><label style={st.lbl}>OS-Template</label><input style={st.inp} value={pve.osTemplate} onChange={e=>setPve(p=>({...p,osTemplate:e.target.value}))}/></div>
+              <div style={{gridColumn:"1/-1",background:"#0f1117",border:"1px solid #a78bfa33",borderRadius:8,padding:14}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#a78bfa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>VMID-Range</div>
+                <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+                  <div><label style={st.lbl}>Von</label><input style={{...st.inp,width:100}} type="number" value={pve.vmidRangeFrom} onChange={e=>setPve(p=>({...p,vmidRangeFrom:+e.target.value}))}/></div>
+                  <div><label style={st.lbl}>Bis</label><input style={{...st.inp,width:100}} type="number" value={pve.vmidRangeTo} onChange={e=>setPve(p=>({...p,vmidRangeTo:+e.target.value}))}/></div>
+                  <button style={st.btn("#a78bfa")} onClick={()=>setServices(s=>assignVmidsFromRange(s,pve.vmidRangeFrom,pve.vmidRangeTo))}>↺ Neu vergeben</button>
+                  {Object.keys(vmidWarnings).length>0&&<button style={st.btn("#ef4444")} onClick={()=>setServices(s=>assignVmidsFromRange(s,pve.vmidRangeFrom,pve.vmidRangeTo))}>⚠️ Konflikte beheben</button>}
+                </div>
+                {Object.keys(vmidWarnings).length>0&&<div style={{marginTop:8,fontSize:11,color:"#ef4444"}}>{Object.entries(vmidWarnings).map(([id,msg])=><div key={id}>• {services.find(s=>s.id===id)?.name}: {msg}</div>)}</div>}
+              </div>
+            </div>}
+            <div style={{marginTop:14,display:"flex",gap:24}}>
+              {[["Unprivileged","unprivileged"],["Start on Boot","startOnBoot"]].map(([l,k])=>(
+                <label key={k} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:13,color:"#94a3b8"}}><Toggle value={pve[k]} onChange={v=>setPve(p=>({...p,[k]:v}))}/> {l}</label>
+              ))}
+            </div>
+          </div>
+
           {/* Volumes */}
           <div style={{...st.card,marginBottom:16}}>
             <div style={{...st.row,cursor:"pointer"}} onClick={()=>setVolOpen(o=>!o)}>
@@ -598,40 +634,6 @@ export default function App() {
           </div>
 
           {lxcSub==="global"&&<>
-            <div style={st.card}>
-              <div style={{...st.row,cursor:"pointer"}} onClick={()=>setPveOpen(o=>!o)}>
-                <span style={st.sec}>Proxmox-Konfiguration</span>
-                <span style={{fontSize:13,color:"#475569",transform:pveOpen?"rotate(90deg)":"none",display:"inline-block",transition:"transform .2s"}}>›</span>
-              </div>
-              {pveOpen&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:14,marginTop:14}}>
-                {[["Node","node"],["Bridge","bridge"],["Default GW","defaultGw"],["Nameserver","nameserver"],["Subnetz-Prefix","subnetCidr"],["OS-Typ","osType"]].map(([l,k])=>(
-                  <div key={k}><label style={st.lbl}>{l}</label><input style={st.inp} value={pve[k]} onChange={e=>setPve(p=>({...p,[k]:e.target.value}))}/></div>
-                ))}
-                <div style={{gridColumn:"1/-1"}}>
-                  <label style={st.lbl}>Storage</label>
-                  <div style={{display:"flex",gap:8}}>
-                    <select style={{...st.inp,flex:1}} value={pve.storage} onChange={e=>setPve(p=>({...p,storage:e.target.value}))}>{storageList.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                    <button style={{...st.btn(apiConnected?"#60a5fa":"#475569"),opacity:apiConnected?1:0.5}} disabled={!apiConnected} onClick={async()=>{ const r=await apiRef.current?.storages().catch(()=>null); if(r?.data) setStorageList(r.data.map(s=>s.storage)); }}>🔄</button>
-                  </div>
-                </div>
-                <div style={{gridColumn:"1/-1"}}><label style={st.lbl}>OS-Template</label><input style={st.inp} value={pve.osTemplate} onChange={e=>setPve(p=>({...p,osTemplate:e.target.value}))}/></div>
-                <div style={{gridColumn:"1/-1",background:"#0f1117",border:"1px solid #a78bfa33",borderRadius:8,padding:14}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#a78bfa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>VMID-Range</div>
-                  <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}}>
-                    <div><label style={st.lbl}>Von</label><input style={{...st.inp,width:100}} type="number" value={pve.vmidRangeFrom} onChange={e=>setPve(p=>({...p,vmidRangeFrom:+e.target.value}))}/></div>
-                    <div><label style={st.lbl}>Bis</label><input style={{...st.inp,width:100}} type="number" value={pve.vmidRangeTo} onChange={e=>setPve(p=>({...p,vmidRangeTo:+e.target.value}))}/></div>
-                    <button style={st.btn("#a78bfa")} onClick={()=>setServices(s=>assignVmidsFromRange(s,pve.vmidRangeFrom,pve.vmidRangeTo))}>↺ Neu vergeben</button>
-                    {Object.keys(vmidWarnings).length>0&&<button style={st.btn("#ef4444")} onClick={()=>setServices(s=>assignVmidsFromRange(s,pve.vmidRangeFrom,pve.vmidRangeTo))}>⚠️ Konflikte beheben</button>}
-                  </div>
-                  {Object.keys(vmidWarnings).length>0&&<div style={{marginTop:8,fontSize:11,color:"#ef4444"}}>{Object.entries(vmidWarnings).map(([id,msg])=><div key={id}>• {services.find(s=>s.id===id)?.name}: {msg}</div>)}</div>}
-                </div>
-              </div>}
-              <div style={{marginTop:14,display:"flex",gap:24}}>
-                {[["Unprivileged","unprivileged"],["Start on Boot","startOnBoot"]].map(([l,k])=>(
-                  <label key={k} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:13,color:"#94a3b8"}}><Toggle value={pve[k]} onChange={v=>setPve(p=>({...p,[k]:v}))}/> {l}</label>
-                ))}
-              </div>
-            </div>
             <div style={st.card}>
               <div style={st.sec}>Pro-Service Ressourcen & IP</div>
               {enabled.map(svc=>(
